@@ -10,25 +10,29 @@ const uid=p=>p+"_"+Date.now().toString(36)+"_"+Math.random().toString(36).slice(
 function openDB(){return new Promise((ok,no)=>{let r=indexedDB.open(DB,V);r.onupgradeneeded=()=>{let d=r.result;["subjects","forms","records"].forEach(x=>{if(!d.objectStoreNames.contains(x))d.createObjectStore(x,{keyPath:"id"})})};r.onsuccess=()=>{db=r.result;ok()};r.onerror=()=>no(r.error)})}
 function all(s){return new Promise((ok,no)=>{let r=db.transaction(s).objectStore(s).getAll();r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)})}function put(s,o){return new Promise((ok,no)=>{let r=db.transaction(s,"readwrite").objectStore(s).put(o);r.onsuccess=ok;r.onerror=()=>no(r.error)})}function del(s,id){return new Promise((ok,no)=>{let r=db.transaction(s,"readwrite").objectStore(s).delete(id);r.onsuccess=ok;r.onerror=()=>no(r.error)})}
 async function load(){subjects=await all("subjects");forms=await all("forms");records=await all("records")}
+async function createSubject(name,order){let s={id:uid("s"),name,order};subjects.push(s);await put("subjects",s);for(let j=1;j<=5;j++){let f={id:uid("f"),subjectId:s.id,name:"記録"+j,maxScore:100,order:j};forms.push(f);await put("forms",f)}}
 async function seed(){
-  // 初回のみ11科目を作成。既存データがある場合は、情報だけ不足していれば1科目だけ追加。
+  const counts={};
+  for(const s of subjects) counts[s.name]=(counts[s.name]||0)+1;
+  const hasDuplicateSubjects=Object.values(counts).some(n=>n>1);
+
+  // 以前の増殖バグで作られた重複科目を、記録が0件のときだけ整理する。
+  if(hasDuplicateSubjects && records.length===0){
+    for(const f of forms) await del("forms",f.id);
+    for(const s of subjects) await del("subjects",s.id);
+    subjects=[];
+    forms=[];
+  }
+
   if(subjects.length===0){
-    for(let i=0;i<presets.length;i++){
-      let s={id:uid("s"),name:presets[i],order:i};
-      subjects.push(s); await put("subjects",s);
-      for(let j=1;j<=5;j++){
-        let f={id:uid("f"),subjectId:s.id,name:"記録"+j,maxScore:100,order:j};
-        forms.push(f); await put("forms",f);
-      }
-    }
-  } else if(!subjects.some(s=>s.name==="情報")){
-    let order=subjects.reduce((m,s)=>Math.max(m,Number(s.order)||0),-1)+1;
-    let s={id:uid("s"),name:"情報",order};
-    subjects.push(s); await put("subjects",s);
-    for(let j=1;j<=5;j++){
-      let f={id:uid("f"),subjectId:s.id,name:"記録"+j,maxScore:100,order:j};
-      forms.push(f); await put("forms",f);
-    }
+    for(let i=0;i<presets.length;i++) await createSubject(presets[i],i);
+    return;
+  }
+
+  // 既存データに情報がなければ、情報だけ追加する。
+  if(!subjects.some(s=>s.name==="情報")){
+    const order=subjects.reduce((m,s)=>Math.max(m,Number(s.order)||0),-1)+1;
+    await createSubject("情報",order);
   }
 }
 function render(x){app.innerHTML=x}
