@@ -1,0 +1,1 @@
+{"name":"成績記録司令部","short_name":"成績記録","start_url":"./","scope":"./","display":"standalone","background_color":"#f4f6fa","theme_color":"#172033","description":"問題集・模試などの得点を科目別に記録するPWA","icons":[{"src":"./icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]}
